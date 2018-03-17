@@ -6,6 +6,7 @@
     Private Delegate Sub voidDelegate()
     Dim _t As Threading.Thread
     Private IsAbortedManully As Boolean '检测 SndKeys的线程 是否人为终止的
+    Private IsButton1Focused As Boolean '检测 Button1 是否有焦点
     'Private Const 
     'https://stackoverflow.com/questions/13727172/vb-net-keydown-event-on-whole-form BUG: 无法执行
     Protected Overrides Sub WndProc(ByRef m As System.Windows.Forms.Message)
@@ -48,7 +49,7 @@
 
     Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
         IsAbortedManully = False '初始化，为将来是否人为终止 线程 做铺垫
-        _t.Sleep(3000)
+        _t.Sleep(3000) '开火前准备
         SndKeys.Start()
     End Sub
 
@@ -61,19 +62,32 @@
         IsAbortedManully = True
         _t = New Threading.Thread(Sub()
                                       Do
-                                          If SndKeys.IsThreadAlive Then
+                                          If SndKeys.IsThreadAlive Then '如果线程已经启动
                                               Me.Invoke(New voidDelegate(Sub()
                                                                              Me.Text = "Started!"
-                                                                             TextBox1.ReadOnly = True '保护
+                                                                             TextBox1.Visible = False '保护
+                                                                             CheckBox1.Enabled = False
                                                                          End Sub))
+                                              If IsButton1Focused Then
+                                                  SndKeys.AbortAll()
+                                                  IsAbortedManully = True
+                                              End If
                                           ElseIf CheckBox1.Checked And (Not IsAbortedManully) Then '如果不是人为终止的 才能重新开始 'BUG 这一步无法执行
-                                              SndKeys.Start()
-                                          Else
-                                              Me.Invoke(New voidDelegate(Sub()
+                                                  SndKeys.Start()
+                                              Else
+                                                  Me.Invoke(New voidDelegate(Sub()
                                                                              Me.Text = "Stopped!"
-                                                                             TextBox1.ReadOnly = False '取消保护
+                                                                             TextBox1.Visible = True '取消保护
+                                                                             CheckBox1.Enabled = True
                                                                          End Sub))
                                           End If
+                                          Me.Invoke(New voidDelegate(Sub()
+                                                                         If Me.Focused Then
+                                                                             Label3.Text = "GotFocus"
+                                                                             'Else
+                                                                             '    Label3.Text = "LostFocus"
+                                                                         End If
+                                                                     End Sub))
                                       Loop
                                   End Sub)
         _t.Start()
@@ -88,5 +102,14 @@
 
     Private Sub TextBox1_TextChanged(sender As Object, e As EventArgs) Handles TextBox1.TextChanged
         SndKeys.Interval = Val(TextBox1.Text)
+        Label2.Text = Val(TextBox1.Text) '同步显示在label2上
+    End Sub
+
+    Private Sub Button1_GotFocus(sender As Object, e As System.EventArgs) Handles Button1.GotFocus
+        IsButton1Focused = True
+    End Sub
+
+    Private Sub Button1_LostFocus(sender As Object, e As System.EventArgs) Handles Button1.LostFocus
+        IsButton1Focused = False
     End Sub
 End Class
